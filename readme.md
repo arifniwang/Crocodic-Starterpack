@@ -56,7 +56,7 @@
 
 5. Setting the database configuration, open .env file at project root directory. For example look on this line :
 ```
-DB_DATABASE=mainproject manager
+DB_DATABASE=**yourdatabase**
 DB_USERNAME=**your_db_user**
 DB_PASSWORD=**password**
 ```
