@@ -1,4 +1,5 @@
 # Laravel - Main Projact Manager
+<br>
 
 > ## Included Package :
 
@@ -13,20 +14,24 @@
 * File System Aws S3 : https://laravel.com/docs/6.x/filesystem | https://joelennon.com/using-digitalocean-spaces-in-laravel
 * Cache Adapter : https://github.com/lukewaite/laravel-aws-cache-adapter | https://laravel.com/docs/6.x/filesystem
 * API Logger : https://github.com/aungwinthant/apilogger
-
+<br>
 
 > ## Configuration
 1. Clone Repository.
 
-2. Import Database in this repository **mainprojectmanager.sql**
+2. Remove **.git** directory to clean up new repository.
 
-3. Setting the database configuration, open .env file at project root directory. For example look on this line :
+3. Import Database in this repository **mainprojectmanager.sql**.
+
+4. Setting the database configuration, open .env file at project root directory. For example look on this line :
 ```
 DB_DATABASE=mainproject manager
 DB_USERNAME=**your_db_user**
 DB_PASSWORD=**password**
 ```
+<br>
 
 > ## Supported By 
+
 - [Crocodic - Mobile Apps Development](crocodic.com)
 - [PT. Taman Media Indonesia](http://tamanmedia.co.id)
