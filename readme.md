@@ -1,6 +1,6 @@
 # Laravel - Main Projact Manager
 
-> ##Included Package :
+> ## Included Package :
 
 * CRUDBooster : https://github.com/crocodic-studio/crudbooster/blob/5.4.0/docs/en/index.md
 * CB Laravel Model : https://github.com/crocodic-studio/cb-model
