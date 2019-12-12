@@ -19,11 +19,42 @@
 > ## Configuration
 1. Clone Repository.
 
-2. Remove **.git** directory to clean up new repository.
+2. Remove directory with all files **.git** directory to clean up new repository.
 
-3. Import Database in this repository **mainprojectmanager.sql**.
+3. Unremark file **.gitignore** in root directory
+* Before : 
+    ```
+    #/node_modules
+    #/public/hot
+    #/public/storage
+    #/storage/*.key
+    #/vendor
+    #.env
+    #.phpunit.result.cache
+    #Homestead.json
+    #Homestead.yaml
+    #npm-debug.log
+    #yarn-error.log
+    ```
+* After : 
+    ```
+    /node_modules
+    /public/hot
+    /public/storage
+    /storage/*.key
+    /vendor
+    .env
+    .phpunit.result.cache
+    Homestead.json
+    Homestead.yaml
+    npm-debug.log
+    yarn-error.log
+    ```
+    
 
-4. Setting the database configuration, open .env file at project root directory. For example look on this line :
+4. Import Database in this repository **mainprojectmanager.sql**.
+
+5. Setting the database configuration, open .env file at project root directory. For example look on this line :
 ```
 DB_DATABASE=mainproject manager
 DB_USERNAME=**your_db_user**
