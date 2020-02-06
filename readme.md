@@ -1,4 +1,4 @@
-# Laravel - Main Projact Manager
+# Laravel - Main Project Manager
 <br>
 
 > ## Included Package :
