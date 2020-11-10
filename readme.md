@@ -62,6 +62,16 @@ DB_PASSWORD=**password**
 ```
 <br>
 
+<br>
+
+> ## Note
+```
+Jika ada conflig ketika menjalankan bisa melakukan update plugin dev yang digunakan dengan mengikuti command dibawah ini :
+$ composer require php-ffmpeg/php-ffmpeg @dev
+$ composer require awt/apilogger @dev
+$ composer update
+```
+
 > ## Supported By 
 
 - [Crocodic - Mobile Apps Development](crocodic.com)
