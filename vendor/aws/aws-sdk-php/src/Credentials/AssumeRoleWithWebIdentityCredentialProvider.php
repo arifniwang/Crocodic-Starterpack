@@ -14,6 +14,7 @@ use GuzzleHttp\Promise;
 class AssumeRoleWithWebIdentityCredentialProvider
 {
     const ERROR_MSG = "Missing required 'AssumeRoleWithWebIdentityCredentialProvider' configuration option: ";
+    const ENV_RETRIES = 'AWS_METADATA_SERVICE_NUM_ATTEMPTS';
 
     /** @var string */
     private $tokenFile;
@@ -59,7 +60,7 @@ class AssumeRoleWithWebIdentityCredentialProvider
             throw new \InvalidArgumentException("'WebIdentityTokenFile' must be an absolute path.");
         }
 
-        $this->retries = isset($config['retries']) ? $config['retries'] : 3;
+        $this->retries = (int) getenv(self::ENV_RETRIES) ?: (isset($config['retries']) ? $config['retries'] : 3);
         $this->attempts = 0;
 
         $this->session = isset($config['SessionName'])
@@ -93,7 +94,20 @@ class AssumeRoleWithWebIdentityCredentialProvider
             $result = null;
             while ($result == null) {
                 try {
-                    $token = file_get_contents($this->tokenFile);
+                    $token = is_readable($this->tokenFile)
+                        ? file_get_contents($this->tokenFile)
+                        : false;
+                    if (false === $token) {
+                        clearstatcache(true, dirname($this->tokenFile) . "/" . readlink($this->tokenFile));
+                        clearstatcache(true, dirname($this->tokenFile) . "/" . dirname(readlink($this->tokenFile)));
+                        clearstatcache(true, $this->tokenFile);
+                        if (!is_readable($this->tokenFile)) {
+                            throw new CredentialsException(
+                                "Unreadable tokenfile at location {$this->tokenFile}"
+                            );
+                        }
+                        $token = file_get_contents($this->tokenFile);
+                    }
                 } catch (\Exception $exception) {
                     throw new CredentialsException(
                         "Error reading WebIdentityTokenFile from " . $this->tokenFile,

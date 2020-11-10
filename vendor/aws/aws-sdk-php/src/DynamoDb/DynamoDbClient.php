@@ -8,6 +8,7 @@ use Aws\Exception\AwsException;
 use Aws\HandlerList;
 use Aws\Middleware;
 use Aws\RetryMiddleware;
+use Aws\RetryMiddlewareV2;
 
 /**
  * This client is used to interact with the **Amazon DynamoDB** service.
@@ -52,6 +53,8 @@ use Aws\RetryMiddleware;
  * @method \GuzzleHttp\Promise\Promise describeContributorInsightsAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result describeEndpoints(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise describeEndpointsAsync(array $args = []) (supported in versions 2012-08-10)
+ * @method \Aws\Result describeExport(array $args = []) (supported in versions 2012-08-10)
+ * @method \GuzzleHttp\Promise\Promise describeExportAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result describeGlobalTable(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise describeGlobalTableAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result describeGlobalTableSettings(array $args = []) (supported in versions 2012-08-10)
@@ -62,10 +65,14 @@ use Aws\RetryMiddleware;
  * @method \GuzzleHttp\Promise\Promise describeTableReplicaAutoScalingAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result describeTimeToLive(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise describeTimeToLiveAsync(array $args = []) (supported in versions 2012-08-10)
+ * @method \Aws\Result exportTableToPointInTime(array $args = []) (supported in versions 2012-08-10)
+ * @method \GuzzleHttp\Promise\Promise exportTableToPointInTimeAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result listBackups(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise listBackupsAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result listContributorInsights(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise listContributorInsightsAsync(array $args = []) (supported in versions 2012-08-10)
+ * @method \Aws\Result listExports(array $args = []) (supported in versions 2012-08-10)
+ * @method \GuzzleHttp\Promise\Promise listExportsAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result listGlobalTables(array $args = []) (supported in versions 2012-08-10)
  * @method \GuzzleHttp\Promise\Promise listGlobalTablesAsync(array $args = []) (supported in versions 2012-08-10)
  * @method \Aws\Result listTagsOfResource(array $args = []) (supported in versions 2012-08-10)
@@ -126,27 +133,40 @@ class DynamoDbClient extends AwsClient
     /** @internal */
     public static function _applyRetryConfig($value, array &$args, HandlerList $list)
     {
-        if (!$value) {
-            return;
-        }
+        if ($value) {
+            $config = \Aws\Retry\ConfigurationProvider::unwrap($value);
 
-        $list->appendSign(
-            Middleware::retry(
-                RetryMiddleware::createDefaultDecider(
-                    $value,
-                    ['errorCodes' => ['TransactionInProgressException']]
-                ),
-                function ($retries) {
-                    return $retries
-                        ? RetryMiddleware::exponentialDelay($retries) / 2
-                        : 0;
-                },
-                isset($args['stats']['retries'])
-                    ? (bool) $args['stats']['retries']
-                    : false
-            ),
-            'retry'
-        );
+            if ($config->getMode() === 'legacy') {
+                $list->appendSign(
+                    Middleware::retry(
+                        RetryMiddleware::createDefaultDecider(
+                            $config->getMaxAttempts() - 1,
+                            ['error_codes' => ['TransactionInProgressException']]
+                        ),
+                        function ($retries) {
+                            return $retries
+                                ? RetryMiddleware::exponentialDelay($retries) / 2
+                                : 0;
+                        },
+                        isset($args['stats']['retries'])
+                            ? (bool)$args['stats']['retries']
+                            : false
+                    ),
+                    'retry'
+                );
+            } else {
+                $list->appendSign(
+                    RetryMiddlewareV2::wrap(
+                        $config,
+                        [
+                            'collect_stats' => $args['stats']['retries'],
+                            'transient_error_codes' => ['TransactionInProgressException']
+                        ]
+                    ),
+                    'retry'
+                );
+            }
+        }
     }
 
     /** @internal */

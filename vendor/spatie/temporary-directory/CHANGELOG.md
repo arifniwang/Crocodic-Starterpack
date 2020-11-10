@@ -2,6 +2,22 @@
 
 All notable changes to `temporary-directory` will be documented in this file
 
+## 1.3.0 - 2020-11-09
+
+- support for PHP 8 (#44)
+
+## 1.2.4 - 2020-09-06
+
+- force php garbage collection cycle (#40)
+
+## 1.2.3 - 2020-06-07
+
+- fix deleting temporary directories with broken symlinks (#39)
+
+## 1.2.2 - 2019-12-15
+
+- create dir with 0777 permissions and allow recursive in empty function (#38)
+
 ## 1.2.1 - 2019-08-28
 
 - delete directories using `FilesystemIterator`

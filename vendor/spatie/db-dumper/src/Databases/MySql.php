@@ -21,6 +21,9 @@ class MySql extends DbDumper
     protected $skipLockTables = false;
 
     /** @var bool */
+    protected $doNotUseColumnStatistics = false;
+
+    /** @var bool */
     protected $useQuick = false;
 
     /** @var string */
@@ -109,6 +112,16 @@ class MySql extends DbDumper
     public function skipLockTables()
     {
         $this->skipLockTables = true;
+
+        return $this;
+    }
+
+    /**
+     * @return $this
+     */
+    public function doNotUseColumnStatistics()
+    {
+        $this->doNotUseColumnStatistics = true;
 
         return $this;
     }
@@ -250,6 +263,10 @@ class MySql extends DbDumper
             $command[] = '--skip-lock-tables';
         }
 
+        if ($this->doNotUseColumnStatistics) {
+            $command[] = '--column-statistics=0';
+        }
+
         if ($this->useQuick) {
             $command[] = '--quick';
         }
@@ -283,6 +300,10 @@ class MySql extends DbDumper
             $command[] = "--tables {$includeTables}";
         }
 
+        foreach ($this->extraOptionsAfterDbName as $extraOptionAfterDbName) {
+            $command[] = $extraOptionAfterDbName;
+        }
+
         return $this->echoToFile(implode(' ', $command), $dumpFile);
     }
 
@@ -307,8 +328,8 @@ class MySql extends DbDumper
             }
         }
 
-        if (strlen('dbName') === 0 && ! $this->allDatabasesWasSetAsExtraOption) {
-            throw CannotStartDump::emptyParameter($requiredProperty);
+        if (strlen($this->dbName) === 0 && ! $this->allDatabasesWasSetAsExtraOption) {
+            throw CannotStartDump::emptyParameter('dbName');
         }
     }
 }

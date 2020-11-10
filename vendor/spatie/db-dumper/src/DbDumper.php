@@ -43,6 +43,9 @@ abstract class DbDumper
     /** @var array */
     protected $extraOptions = [];
 
+    /** @var array */
+    protected $extraOptionsAfterDbName = [];
+
     /** @var object */
     protected $compressor = null;
 
@@ -238,6 +241,20 @@ abstract class DbDumper
         return $this;
     }
 
+    /**
+     * @param string $extraOptionAtEnd
+     *
+     * @return $this
+     */
+    public function addExtraOptionAfterDbName(string $extraOptionAfterDbName)
+    {
+        if (! empty($extraOptionAfterDbName)) {
+            $this->extraOptionsAfterDbName[] = $extraOptionAfterDbName;
+        }
+
+        return $this;
+    }
+
     abstract public function dumpToFile(string $dumpFile);
 
     protected function checkIfDumpWasSuccessFul(Process $process, string $outputFile)
@@ -255,14 +272,23 @@ abstract class DbDumper
         }
     }
 
+    protected function getCompressCommand(string $command, string $dumpFile): string
+    {
+        $compressCommand = $this->compressor->useCommand();
+
+        if ($this->isWindows()) {
+            return "{$command} | {$compressCommand} > {$dumpFile}";
+        }
+
+        return "(((({$command}; echo \$? >&3) | {$compressCommand} > {$dumpFile}) 3>&1) | (read x; exit \$x))";
+    }
+
     protected function echoToFile(string $command, string $dumpFile): string
     {
         $dumpFile = '"'.addcslashes($dumpFile, '\\"').'"';
 
         if ($this->compressor) {
-            $compressCommand = $this->compressor->useCommand();
-
-            return "(((({$command}; echo \$? >&3) | {$compressCommand} > {$dumpFile}) 3>&1) | (read x; exit \$x))";
+            return $this->getCompressCommand($command, $dumpFile);
         }
 
         return $command.' > '.$dumpFile;
@@ -270,6 +296,11 @@ abstract class DbDumper
 
     protected function determineQuote(): string
     {
-        return strtoupper(substr(PHP_OS, 0, 3)) === 'WIN' ? '"' : "'";
+        return $this->isWindows() ? '"' : "'";
+    }
+
+    protected function isWindows(): bool
+    {
+        return strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
     }
 }

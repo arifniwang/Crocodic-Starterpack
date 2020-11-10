@@ -4,6 +4,7 @@ namespace Aws\Credentials;
 use Aws\Exception\CredentialsException;
 use Aws\Exception\InvalidJsonException;
 use Aws\Sdk;
+use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Promise;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\Request;
@@ -11,7 +12,7 @@ use GuzzleHttp\Promise\PromiseInterface;
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * Credential provider that provides credentials from the EC2 metadata server.
+ * Credential provider that provides credentials from the EC2 metadata service.
  */
 class InstanceProfileProvider
 {
@@ -20,6 +21,8 @@ class InstanceProfileProvider
     const TOKEN_PATH = 'api/token';
 
     const ENV_DISABLE = 'AWS_EC2_METADATA_DISABLED';
+    const ENV_TIMEOUT = 'AWS_METADATA_SERVICE_TIMEOUT';
+    const ENV_RETRIES = 'AWS_METADATA_SERVICE_NUM_ATTEMPTS';
 
     /** @var string */
     private $profile;
@@ -50,9 +53,9 @@ class InstanceProfileProvider
      */
     public function __construct(array $config = [])
     {
-        $this->timeout = isset($config['timeout']) ? $config['timeout'] : 1.0;
+        $this->timeout = (float) getenv(self::ENV_TIMEOUT) ?: (isset($config['timeout']) ? $config['timeout'] : 1.0);
         $this->profile = isset($config['profile']) ? $config['profile'] : null;
-        $this->retries = isset($config['retries']) ? $config['retries'] : 3;
+        $this->retries = (int) getenv(self::ENV_RETRIES) ?: (isset($config['retries']) ? $config['retries'] : 3);
         $this->attempts = 0;
         $this->client = isset($config['client'])
             ? $config['client'] // internal use only
@@ -79,8 +82,9 @@ class InstanceProfileProvider
                             'x-aws-ec2-metadata-token-ttl-seconds' => 21600
                         ]
                     ));
-                } catch (RequestException $e) {
-                    if (empty($e->getResponse())
+                } catch (TransferException $e) {
+                    if (!method_exists($e, 'getResponse')
+                        || empty($e->getResponse())
                         || !in_array(
                             $e->getResponse()->getStatusCode(),
                             [400, 500, 502, 503, 504]
@@ -116,7 +120,7 @@ class InstanceProfileProvider
                         'GET',
                         $headers
                     ));
-                } catch (RequestException $e) {
+                } catch (TransferException $e) {
                     // 401 indicates insecure flow not supported, switch to
                     // attempting secure mode for subsequent calls
                     if (!empty($this->getExceptionStatusCode($e))
@@ -152,7 +156,7 @@ class InstanceProfileProvider
                             'Invalid JSON response, retries exhausted'
                         )
                     );
-                } catch (RequestException $e) {
+                } catch (TransferException $e) {
                     // 401 indicates insecure flow not supported, switch to
                     // attempting secure mode for subsequent calls
                     if (!empty($this->getExceptionStatusCode($e))
@@ -189,7 +193,7 @@ class InstanceProfileProvider
         $disabled = getenv(self::ENV_DISABLE) ?: false;
         if (strcasecmp($disabled, 'true') === 0) {
             throw new CredentialsException(
-                $this->createErrorMessage('EC2 metadata server access disabled')
+                $this->createErrorMessage('EC2 metadata service access disabled')
             );
         }
 
@@ -210,7 +214,7 @@ class InstanceProfileProvider
                 return (string) $response->getBody();
             })->otherwise(function (array $reason) {
                 $reason = $reason['exception'];
-                if ($reason instanceof \GuzzleHttp\Exception\RequestException) {
+                if ($reason instanceof TransferException) {
                     throw $reason;
                 }
                 $msg = $reason->getMessage();
@@ -252,7 +256,7 @@ class InstanceProfileProvider
     private function createErrorMessage($previous)
     {
         return "Error retrieving credentials from the instance profile "
-            . "metadata server. ({$previous})";
+            . "metadata service. ({$previous})";
     }
 
     private function decodeResult($response)

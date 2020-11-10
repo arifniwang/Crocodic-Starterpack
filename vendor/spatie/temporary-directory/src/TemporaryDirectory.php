@@ -29,7 +29,7 @@ class TemporaryDirectory
         }
 
         if (empty($this->name)) {
-            $this->name = mt_rand() . '-' .str_replace([' ', '.'], '', microtime());
+            $this->name = mt_rand().'-'.str_replace([' ', '.'], '', microtime());
         }
 
         if ($this->forceCreate && file_exists($this->getFullPath())) {
@@ -86,7 +86,7 @@ class TemporaryDirectory
     public function empty(): self
     {
         $this->deleteDirectory($this->getFullPath());
-        mkdir($this->getFullPath());
+        mkdir($this->getFullPath(), 0777, true);
 
         return $this;
     }
@@ -143,6 +143,10 @@ class TemporaryDirectory
 
     protected function deleteDirectory(string $path): bool
     {
+        if (is_link($path)) {
+            return unlink($path);
+        }
+
         if (! file_exists($path)) {
             return true;
         }
@@ -156,6 +160,12 @@ class TemporaryDirectory
                 return false;
             }
         }
+
+        /*
+         * By forcing a php garbage collection cycle using gc_collect_cycles() we can ensure
+         * that the rmdir does not fail due to files still being reserved in memory.
+         */
+        gc_collect_cycles();
 
         return rmdir($path);
     }
