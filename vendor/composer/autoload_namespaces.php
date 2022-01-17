@@ -15,6 +15,5 @@ return array(
     'Maatwebsite\\Excel\\' => array($vendorDir . '/maatwebsite/excel/src'),
     'FFMpeg' => array($vendorDir . '/php-ffmpeg/php-ffmpeg/src'),
     'Evenement' => array($vendorDir . '/evenement/evenement/src'),
-    'Crocodicstudio\\Cbmodel' => array($vendorDir . '/crocodicstudio/cbmodel/src'),
     'Alchemy' => array($vendorDir . '/alchemy/binary-driver/src'),
 );

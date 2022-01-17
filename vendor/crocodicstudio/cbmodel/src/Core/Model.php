@@ -1,405 +1,318 @@
 <?php
-namespace Crocodicstudio\Cbmodel\Core;
+/**
+ * Created by PhpStorm.
+ * User: User
+ * Date: 2/14/2020
+ * Time: 1:28 PM
+ */
 
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
+namespace crocodicstudio\cbmodel\Core;
+
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Crocodicstudio\Cbmodel\Helpers\Helper;
-use Illuminate\Support\Str;
 
-class Model
+class Model extends ModelAbstract
 {
-    private static $tableQuery = null;
-    public static $tableName = null;
-    public static $connection = null;
-    private static $relations = [];
-    public static $autojoin = true;
-    public static $joinException = [];
-    private static $id = null;
-    private static $lastInsertId = null;
-    private static $uniqueData = false;
-    private static $rowTemp = null;
-
-    public function __construct($row = null)
-    {
-        if($row) {
-            foreach ($row as $key => $val) {
-                if ($key) {
-                    $methodName = Str::camel('set ' . $key);
-                    if(method_exists($this, $methodName)) {
-                        $this->$methodName($val);
-                    }
-                }
-            }
-            self::$rowTemp = $row;
-        }
-    }
+    use ModelSetter;
 
     /**
-     * @return mixed|Builder
-     */
-    public static function table()
-    {
-        if (isset(self::$tableQuery['tableName']) && self::$tableQuery['tableName'] != static::$tableName) {
-            self::$relations = [];
-            self::$joinException = [];
-            self::$autojoin = true;
-            self::$id = null;
-            self::$lastInsertId = null;
-        }
-
-        self::$tableQuery['tableName'] = static::$tableName;
-        self::$tableQuery['query'] = DB::connection(static::$connection)->table(static::$tableName)->select(static::$tableName . '.*');
-
-        if (self::$autojoin) {
-            self::autoJoinIt(static::$tableName);
-        }
-
-
-        if (count(self::$relations)) {
-
-            foreach (self::$relations as $relate) {
-                $tableFrom = (Str::contains($relate['tableFrom'], ' as ')) ? Str::after($relate['tableFrom'], ' as ') : $relate['tableFrom'];
-                self::$tableQuery['query']->leftjoin($relate['tableFrom'], $tableFrom . '.' . $relate['tableFromPK'], $relate['operator'], $relate['dest']);
-
-                $columns = DB::connection(static::$connection)->getSchemaBuilder()->getColumnListing($relate['tableFrom']);
-                foreach ($columns as $column) {
-                    $alias = ($relate['prefix']) ? $relate['prefix'] . '_' . $relate['tableFrom'] . '_' . $column : $relate['tableFrom'] . '_' . $column;
-                    self::$tableQuery['query']->addselect($tableFrom . '.' . $column . ' as ' . $alias);
-                }
-            }
-        }
-
-        return self::$tableQuery['query'];
-    }
-
-
-
-    /**
-     * @return Builder
-     */
-    public static function simpleQuery()
-    {
-        return DB::connection(static::$connection)->table(static::$tableName);
-    }
-
-    /**
-     * @return null
-     */
-    public static function getTableName()
-    {
-        return static::$tableName;
-    }
-
-
-    /**
+     * Get last record id
      * @return mixed
      */
-    public static function query()
-    {
-        return self::$tableQuery['query'];
+    public static function lastId() {
+        return DB::table((new static())->table)->max((new static())->primary_key);
     }
 
     /**
-     * @return null|string
-     */
-    public static function getPrimaryKey()
-    {
-        return Helper::findPrimaryKey(self::getTableName(), static::$connection);
-    }
-
-    /**
-     * @return string
-     */
-    public static function getPrimaryField()
-    {
-        return static::$tableName . '.' . static::getPrimaryKey();
-    }
-
-    /**
+     * A one-to-many relationship
+     * @param string $modelName Parent model class name
+     * @param string|null $foreignKey
+     * @param string|null $localKey
+     * @param callable|null $condition Add condition with Builder Query
      * @return mixed
      */
-    public static function getMaxId()
-    {
-        return DB::connection(static::$connection)
-            ->table(self::getTableName())->max(self::getPrimaryKey());
-    }
-
-    /**
-     * @param $tableName
-     */
-    private static function autoJoinIt($tableName)
-    {
-        $columns = DB::connection(static::$connection)->getSchemaBuilder()->getColumnListing($tableName);
-        foreach ($columns as $column) {
-            if (in_array($column, static::$joinException)) continue;
-
-            if (Str::endsWith($column, '_id')) {
-                $relationTable = str_replace('_id', '', $column);
-               
-                if (Schema::hasTable($relationTable)) {
-		    $relationTablePK = Helper::findPrimaryKey($relationTable, static::$connection);
-                    self::join($relationTable, $relationTablePK, '=', $tableName.'.'.$column);
-                }
-            }elseif (Str::startsWith($column, 'id_')) {
-                $relationTable = str_replace('id_', '', $column);
-                
-                if (Schema::hasTable($relationTable)) {
-		    $relationTablePK = Helper::findPrimaryKey($relationTable, static::$connection);
-                    self::join($relationTable, $relationTablePK, '=', $tableName.'.'.$column);
-                }
-            }
-        }
-    }
-
-    public static function addSelectFile($field, $alias = null)
-    {
-        $alias = ($alias) ?: str_replace('.', '_', $field);
-        self::$tableQuery['query']->addselect(DB::raw("
-			CASE 
-				WHEN " . $field . " IS NULL THEN ''  
-				ELSE CONCAT('" . asset('/') . "'," . $field . ") 
-			END AS " . $alias . "	
-			"));
-    }
-
-    /**
-     * @param $tableFrom
-     * @param null $tableFromPK
-     * @param null $operator
-     * @param null $dest
-     * @param null $prefix
-     */
-    public static function leftjoin($tableFrom, $tableFromPK = null, $operator = null, $dest = null, $prefix = null)
-    {
-        if ($tableFromPK == null) $tableFromPK = $tableFrom . '.id';
-        if ($operator == null) $operator = '=';
-        if ($dest == null) $dest = $tableFrom . '_id';
-
-        self::$relations[$tableFrom] = ['tableFrom' => $tableFrom, 'tableFromPK' => $tableFromPK, 'operator' => $operator, 'dest' => $dest, 'prefix' => $prefix, 'leftjoin' => true];
-    }
-
-    /**
-     * @param $tableFrom
-     * @param null $tableFromPK
-     * @param null $operator
-     * @param null $dest
-     * @param null $prefix
-     */
-    public static function join($tableFrom, $tableFromPK = null, $operator = null, $dest = null, $prefix = null)
-    {
-        if ($tableFromPK == null) $tableFromPK = $tableFrom . '.id';
-        if ($operator == null) $operator = '=';
-        if ($dest == null) $dest = $tableFrom . '_id';
-
-        self::$relations[$tableFrom] = ['tableFrom' => $tableFrom, 'tableFromPK' => $tableFromPK, 'operator' => $operator, 'dest' => $dest, 'prefix' => $prefix];
-    }
-
-
-    public static function init()
-    {
-        if (!self::$tableQuery || self::$tableQuery['tableName'] != self::$tableName) {
-            static::$connection = (static::$connection)?:config("database.default");
-            self::table();
-        }
-    }
-
-    public static function hookQuery($query)
-    {
-        self::init();
-        call_user_func($query, self::$tableQuery['query']);
-        return new self();
-    }
-
-    public static function limit($limit = 20)
-    {
-        self::hookQuery(function ($query) use ($limit) {
-            $query->take($limit);
+    public function hasMany(string $modelName, string $foreignKey = null, string $localKey = null, callable $condition = null) {
+        $childModel = new $modelName();
+        $parentModel = new static();
+        $foreignKey = ($foreignKey) ? $foreignKey : $parentModel->table."_".$parentModel->primary_key;
+        $localKey = ($localKey) ? $localKey : $parentModel->primary_key;
+        $localKey = $this->$localKey;
+        return $childModel::queryList(function($query) use ($foreignKey, $localKey, $condition) {
+            $query = $query->where($foreignKey, $localKey);
+            if(isset($condition) && is_callable($condition)) $query = call_user_func($condition, $query);
+            return $query;
         });
-        return new self();
-    }
-
-
-    public static function offset($offset = 0)
-    {
-        self::hookQuery(function ($query) use ($offset) {
-            $query->skip($offset);
-        });
-        return new self();
-    }
-
-
-    public static function orderby($field, $order)
-    {
-        self::hookQuery(function ($query) use ($field, $order) {
-            $query->orderby($field, $order);
-        });
-        return new self();
-    }
-
-
-    /**
-     * @param mixed
-     * @return $this|static
-     */
-    public static function fromQueryBuilder($row)
-    {
-        return new static($row);
     }
 
     /**
-     * @param mixed
-     * @return $this|static
+     * A one-to-one relationship
+     * @param string $modelName
+     * @param string|null $foreignKey
+     * @param string|null $localKey
+     * @return mixed
      */
-    public static function findById($id)
-    {
-
-        self::init();
-        self::$id = $id;
-
-        if($data = app("CBModelTemporary")->get(get_called_class(),"findById",$id)) {
-            return new static($data);
-        }else{
-            $data = self::simpleQuery()->where(static::getPrimaryField(),$id)->first();
-            app("CBModelTemporary")->set(get_called_class(),"findById",$id,$data);
-            return new static($data);
-        }
+    public function belongsTo(string $modelName, string $foreignKey = null, string $localKey = null) {
+        $childModel = new $modelName();
+        $parentModel = new static();
+        $foreignKey = ($foreignKey) ? $foreignKey : $parentModel->table."_".$parentModel->primary_key;
+        $localKey = ($localKey) ? $localKey : $parentModel->primary_key;
+        $localKey = $this->$localKey;
+        return $childModel::query(function($query) use ($foreignKey, $localKey) {
+            return $query->where($foreignKey, $localKey);
+        });
     }
 
-    public static function findBy($field, $value)
-    {
-        self::init();
-        $pk = static::getPrimaryKey();
+    /**
+     * @return \Illuminate\Database\Query\Builder
+     */
+    public static function table() {
+        return DB::table((new static())->table);
+    }
 
-        if($data = app("CBModelTemporary")->get(get_called_class(),"findBy",$value)) {
-            self::$id = $data->{$pk};
-            return new static($data);
-        }else{
+    /**
+     * @param callable $query
+     * @return static
+     */
+    public static function query(callable $query) {
+        $query = call_user_func($query, static::table());
+        return static::objectSetter($query->first());
+    }
 
-            $data = self::simpleQuery()->where($field,$value)->first();
-            if($data) {
-                self::$id = $data->{$pk};
-                app("CBModelTemporary")->set(get_called_class(),"findBy",$value,$data);
+    /**
+     * @param callable $query
+     * @return static[]
+     */
+    public static function queryList(callable $query) {
+        $query = call_user_func($query, static::table());
+        return static::listSetter($query->get());
+    }
+
+    /**
+     * @param array|string $column
+     * @param string|null $value
+     * @param string $sorting_column
+     * @param string $sorting_dir
+     * @return static[]
+     */
+    public static function findAllBy($column, $value = null, $sorting_column = "id", $sorting_dir = "desc") {
+        if(is_array($column)) {
+            $result = DB::table((new static())->table);
+            foreach($column as $key=>$value) {
+                $result->where($key, $value);
             }
-            return new static($data);
-        }
-    }
+            $result = $result->orderBy($sorting_column, $sorting_dir)->get();
+        } else {
 
-    public function toObject()
-    {
-        if(isset(self::$rowTemp)) {
-            return self::$rowTemp;
-        }else{
-            return new \Exception("Call the method on null object");
+            $result = DB::table((new static())->table)->where($column, $value)->orderBy($sorting_column, $sorting_dir)->get();
         }
-    }
 
-    public function uniqueData() {
-        self::$uniqueData = true;
-        return new self();
+        return static::listSetter($result);
     }
 
     /**
-     * @throws \Exception
+     * @return integer
      */
-    public function saveUnique() {
-        self::uniqueData();
-        try{
-            self::save();
-        }catch (\Exception $e) {
-            throw new \Exception($e);
+    public static function count() {
+        $total = app("CBModelTemporary")->get(static::class, "count", (new static())->table);
+        if(!isset($total)) {
+            $total = DB::table((new static())->table)->count();
+            app("CBModelTemporary")->put(static::class, "count", (new static())->table);
         }
+        return $total;
     }
 
     /**
-     * @return int|mixed|null
-     * @throws \Exception
+     * @param array|string $column
+     * @param string|null $value
+     * @return integer
      */
-    public function save()
-    {
-        try{
-            $model = $this;
-            $pk = Helper::findPrimaryKey(static::$tableName, static::$connection);
-            $columns = DB::connection(static::$connection)->getSchemaBuilder()->getColumnListing(static::$tableName);
+    public static function countBy($column, $value = null) {
+        if(is_array($column)) {
+            $result = DB::table((new static())->table);
+            foreach($column as $key=>$value) {
+                $result->where($key, $value);
+            }
+            $result = $result->count();
+        } else {
 
-            $data = [];
-            foreach($columns as $column)
-            {
-                $methodName = Str::camel('get '.$column);
-                if(method_exists($model, $methodName)) {
-                    $getAttr = $model->{$methodName}();
-                    if(is_object($getAttr)) {
-                        if(method_exists($getAttr, "getPrimaryKey")) {
-                            $pkMethod = Str::camel('get '.$getAttr->getPrimaryKey());
-                            $data[$column] = $getAttr->{$pkMethod}();
-                        }else{
-                            $data[$column] = $getAttr;
-                        }
-                    }else{
-                        $data[$column] = $getAttr;
-                    }
+            $result = DB::table((new static())->table)
+                ->where($column, $value)
+                ->count();
+        }
+        return $result;
+    }
+
+    /**
+     * @param $column
+     * @return static[]
+     */
+    public static function findAllDesc($column = "id") {
+        $result = DB::table((new static())->table)->orderBy($column,"desc")->get();
+        return static::listSetter($result);
+    }
+
+    /**
+     * @param $column
+     * @return static[]
+     */
+    public static function findAllAsc($column = "id") {
+        $result = DB::table((new static())->table)->orderBy($column,"asc")->get();
+        return static::listSetter($result);
+    }
+
+    /**
+     * @param callable|null $query Query Builder
+     * @return static[]
+     */
+    public static function findAll(callable $query = null) {
+        if(is_callable($query)) {
+            $result = call_user_func($query, static::table());
+            $result = $result->get();
+        } else {
+            $result = static::table()->get();
+        }
+        return static::listSetter($result);
+    }
+
+    /**
+     * @return static[]
+     */
+    public static function latest() {
+        $result = DB::table((new static())->table)->orderBy((new static())->primary_key,"desc")->get();
+        return static::listSetter($result);
+    }
+
+    /**
+     * @return static[]
+     */
+    public static function oldest() {
+        $result = DB::table((new static())->table)->orderBy((new static())->primary_key,"asc")->get();
+        return static::listSetter($result);
+    }
+
+    public function toArray() {
+        $result = [];
+        foreach($this as $key=>$val) {
+            $result[$key] = $val;
+        }
+        return $result;
+    }
+
+    /**
+     * @param $id
+     * @return static
+     */
+    public static function findById($id) {
+        $row = app("CBModelTemporary")->get(static::class, "findById", $id);
+        if(!$row) {
+            $row = DB::table((new static())->table)
+                ->where((new static())->primary_key,$id)
+                ->first();
+            app("CBModelTemporary")->put(static::class, "findById", $id, $row);
+        }
+
+        return static::objectSetter($row);
+    }
+
+    /**
+     * @param $id
+     * @return static
+     */
+    public static function find($id) {
+        return static::findById($id);
+    }
+
+    /**
+     * @param array|string $column
+     * @param string|null $value
+     * @return static
+     */
+    public static function findBy($column, $value = null) {
+        if(is_array($column)) {
+            $row = DB::table((new static())->table)
+                ->where($column)
+                ->first();
+        } else {
+            $row = DB::table((new static())->table)
+                ->where($column,$value)
+                ->first();
+        }
+
+        return static::objectSetter($row);
+    }
+
+    /**
+     * To save insert many data
+     * @param Model[] $data
+     */
+    public static function bulkInsert(array $data) {
+        $insertData = [];
+        foreach($data as $row) {
+            /** @var Model $row */
+            $dataArray = $row->toArray();
+            $insertData[] = $dataArray;
+        }
+        DB::table((new static())->table)->insertOrIgnore($insertData);
+    }
+
+    public function save() {
+        $primary_key = (new static())->primary_key;
+        $data = [];
+        foreach($this as $key=>$val) {
+            if(!in_array($key,[$primary_key])) {
+                if(isset($this->{$key})) {
+                    $data[$key] = $val;
                 }
             }
+        }
 
-            if(Schema::hasColumn(static::$tableName,'updated_at')) {
-                $data['updated_at'] = date('Y-m-d H:i:s');
+        unset($data['table'], $data['connection'], $data['primary_key']);
+
+        if($this->{$primary_key}) {
+            if(isset($data['created_at'])) {
+                unset($data['created_at']);
             }
-
-            if(Schema::hasColumn(static::$tableName,'created_at')) {
+            DB::table((new static())->table)->where($primary_key, $this->{$primary_key})->update($data);
+            $id = $this->{$primary_key};
+        } else {
+            if(property_exists($this,'created_at')) {
                 $data['created_at'] = date('Y-m-d H:i:s');
             }
-
-            if(isset($data[$pk])) {
-                $pkValue = $data[$pk];
-                unset($data[$pk]);
-                DB::connection(static::$connection)->table(static::$tableName)->where($pk,$pkValue)->update($data);
-            }else{
-                if(self::$uniqueData) {
-                    if(DB::connection(static::$connection)->table(static::$tableName)->where($data)->exists()) {
-                        throw new \Exception("The data has already exists!");
-                    }
-                }
-
-                self::$lastInsertId = DB::connection(static::$connection)
-                    ->table(static::$tableName)
-                    ->insertGetId($data);
-                $pkValue = self::$lastInsertId;
-            }
-
-            //set to setId()
-            $pkSetMethod = Str::camel('set '.$pk);
-            $this->{$pkSetMethod}( $pkValue );
-
-            return $pkValue;
-        }catch (\Exception $e) {
-            throw new \Exception($e);
+            $id = DB::table((new static())->table)->insertGetId($data);
         }
-    }
 
-    public function delete($id = null)
-    {
-        if(self::$id || $id) {
-            $id = ($id)?:self::$id;
-            $pk = Helper::findPrimaryKey(static::$tableName, static::$connection);
-            DB::connection(static::$connection)->table(self::getTableName())->where($pk,$id)->delete();
-        }
-    }
-
-    public static function deleteById($id) {
-        if(self::$id || $id) {
-            $id = ($id)?:self::$id;
-            $pk = Helper::findPrimaryKey(static::$tableName, static::$connection);
-            DB::connection(static::$connection)->table(self::getTableName())->where($pk,$id)->delete();
-        }
+        $this->{$primary_key} = $id;
+        return ($id)?true:false;
     }
 
     /**
-     * @return Collection
+     * @param $id
      */
-    public static function all()
-    {
-        self::init();
-        return self::$tableQuery['query']->get();
+    public static function deleteById($id) {
+        DB::table((new static())->table)->where((new static())->primary_key,$id)->delete();
     }
+
+    /**
+     * @param string|array $column
+     * @param null $value
+     */
+    public static function deleteBy($column, $value = null) {
+        if(is_array($column)) {
+            $result = DB::table((new static())->table);
+            foreach($column as $key=>$value) {
+                $result->where($key, $value);
+            }
+            $result->delete();
+        } else {
+            if(!$value) {
+                throw new \InvalidArgumentException("Missing argument 2 value");
+            }
+
+            DB::table((new static())->table)->where($column,$value)->delete();
+        }
+    }
+
+    public function delete() {
+        DB::table((new static())->table)->where((new static())->primary_key, $this->{$primary_key})->delete();
+    }
+
 }

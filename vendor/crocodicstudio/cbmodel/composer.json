@@ -1,6 +1,6 @@
 {
     "name": "crocodicstudio/cbmodel",
-    "description": "Boost your laravel database relation",
+    "description": "Boost your laravel database relation with model enhancement",
     "type": "library",
     "license": "MIT",
     "authors": [
@@ -11,18 +11,23 @@
     ],
     "minimum-stability": "dev",
     "require": {
-      "php": ">=7.2",
-      "laravel/framework": "6.*|5.7.*|5.8.*"
+      "php": "~7.2|~7.3",
+      "doctrine/dbal": "^2.10",
+      "illuminate/support":"^5.7|^6.0|^7.0",
+      "illuminate/console":"^5.7|^6.0|^7.0"
+    },
+    "require-dev": {
+
     },
     "autoload": {
-      "psr-0": {
-        "Crocodicstudio\\Cbmodel": "src/"
+      "psr-4": {
+        "crocodicstudio\\cbmodel\\": "src/"
       }
     },
     "extra": {
       "laravel": {
         "providers": [
-          "Crocodicstudio\\Cbmodel\\CBModelServiceProvider"
+          "crocodicstudio\\cbmodel\\CBModelServiceProvider"
         ]
       }
     }
