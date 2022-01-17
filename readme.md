@@ -76,4 +76,4 @@ $ composer update
 
 - [Crocodic - Mobile Apps Development](crocodic.com)
 - [PT. Taman Media Indonesia](http://tamanmedia.co.id)
-- [CRUDBooster] (https://crudbooster.com/)
+- [CRUDBooster](https://crudbooster.com/)
